@@ -34,6 +34,8 @@ PAGE = PAGE.replace('</script></body></html>', "$('profile').onclick=async()=>{c
 PAGE = PAGE.replace('<button id="run">', '<button id="inspect">Review labels</button><button id="run">')
 PAGE = PAGE.replace('</script></body></html>', r'''document.querySelector('main').insertAdjacentHTML('afterbegin','<section class="card" id="review" style="display:none;margin-bottom:18px"><h2>Label prompt review</h2><div id="reviewItems"></div></section>');let reviewId=null;let reviewItems=[];$('inspect').onclick=async()=>{const response=await fetch('/api/inspect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:$('url').value})});const result=await response.json();if(!response.ok){$('state').textContent=result.error;return}reviewId=result.id;reviewItems=result.descriptions;$('review').style.display='block';$('reviewItems').innerHTML=reviewItems.map((item,index)=>`<div style="display:grid;grid-template-columns:28px 180px 1fr;gap:8px;margin:8px 0"><input type="checkbox" checked data-index="${index}"><strong>${item.label}</strong><input value="${item.prompt.replace(/"/g,'&quot;')}" data-prompt="${index}"></div>`).join('');$('state').textContent=`Loaded ${reviewItems.length} labels`};$('run').onclick=async()=>{if(!reviewId){$('state').textContent='Review labels first';return}const selected=reviewItems.filter((item,index)=>document.querySelector(`[data-index="${index}"]`).checked).map((item,index)=>({label:item.label,prompt:document.querySelector(`[data-prompt="${index}"]`).value}));$('run').disabled=true;const response=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:$('url').value,organization:$('org').value,model:'sam3',mode:$('mode').value,max_points:$('points').value,selected_prompts:selected})});const result=await response.json();if(!response.ok){$('console').textContent=result.error;$('run').disabled=false;return}runId=result.id;poll()};</script></body></html>''')
 PAGE = PAGE.replace(r'''reviewItems.filter((item,index)=>document.querySelector(`[data-index="${index}"]`).checked).map((item,index)=>({label:item.label,prompt:document.querySelector(`[data-prompt="${index}"]`).value}))''', r'''reviewItems.map((item,index)=>({item,index})).filter(({index})=>document.querySelector(`[data-index="${index}"]`).checked).map(({item,index})=>({label:item.label,prompt:document.querySelector(`[data-prompt="${index}"]`).value}))''')
+PAGE = PAGE.replace('<h2>Label prompt review</h2>', '<h2>Label prompt review</h2><div style="display:flex;gap:8px;margin-bottom:14px"><input id="agentChat" placeholder="Ví dụ: chỉ giữ người, xe, đường và cây"><button id="agentFilter">Agent lọc label</button></div>')
+PAGE = PAGE.replace('</script></body></html>', r'''$('agentFilter').onclick=async()=>{const response=await fetch('/api/chat-filter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:$('agentChat').value,descriptions:reviewItems})});const result=await response.json();if(!response.ok){$('state').textContent=result.error;return}document.querySelectorAll('[data-index]').forEach((box,index)=>{box.checked=result.selected.includes(index)});$('state').textContent=`Agent giữ ${result.selected.length}/${reviewItems.length} label`};</script></body></html>''')
 
 
 def inspect_job(url):
@@ -57,6 +59,42 @@ def inspect_job(url):
     descriptions = LabelDescriptionAgent().build(list(dict.fromkeys(labels)), path)
     REVIEWS[review_id] = path
     return review_id, descriptions
+
+
+def filter_labels(message, descriptions):
+    text = message.strip().lower()
+    if not text:
+        return list(range(len(descriptions)))
+    groups = {
+        'người': {'person', 'pedestrian', 'rider'},
+        'xe': {'car', 'truck', 'bus', 'train', 'motorcycle', 'bicycle', 'rider'},
+        'giao thông': {'car', 'truck', 'bus', 'train', 'motorcycle', 'bicycle', 'traffic light', 'traffic_light', 'traffic sign', 'traffic_sign'},
+        'cây': {'vegetation', 'tree', 'trees'},
+        'thiên nhiên': {'vegetation', 'terrain', 'sky'},
+        'đường': {'road', 'sidewalk', 'lane/crosswalk', 'lane/double white', 'lane/double yellow', 'lane/road curb', 'lane/single other', 'lane/single white', 'lane/single yellow'},
+        'nhà': {'building', 'wall', 'fence'},
+    }
+    terms = {word for word in re.split(r'[,;\s]+', text) if word}
+    wanted = set()
+    for key, values in groups.items():
+        if key in text:
+            wanted.update(values)
+    for item in descriptions:
+        normalized = item['label'].lower().replace('_', ' ')
+        if normalized in terms or item['label'].lower() in text or normalized in text:
+            wanted.add(item['label'].lower())
+    return [index for index, item in enumerate(descriptions) if item['label'].lower() in wanted or item['label'].lower().replace('_', ' ') in wanted]
+
+
+def read_json_body(handler):
+    length = int(handler.headers.get('Content-Length', '0'))
+    body = handler.rfile.read(length)
+    for encoding in ('utf-8', 'utf-8-sig', 'cp1258', 'cp1252'):
+        try:
+            return json.loads(body.decode(encoding))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+    raise ValueError('Invalid JSON request body')
 
 
 def update(run_id, line):
@@ -127,19 +165,25 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({'error': 'Not found'}, 404)
 
     def do_POST(self):
-        if self.path == '/api/inspect':
-            length = int(self.headers.get('Content-Length', '0'))
-            payload = json.loads(self.rfile.read(length))
+        if self.path == '/api/chat-filter':
             try:
+                payload = read_json_body(self)
+                selected = filter_labels(payload.get('message', ''), payload.get('descriptions', []))
+                self.send_json({'selected': selected})
+            except Exception as error:
+                self.send_json({'error': str(error)}, 500)
+            return
+        if self.path == '/api/inspect':
+            try:
+                payload = read_json_body(self)
                 review_id, descriptions = inspect_job(payload.get('url', ''))
                 self.send_json({'id': review_id, 'descriptions': descriptions})
             except Exception as error:
                 self.send_json({'error': str(error)}, 500)
             return
         if self.path == '/api/open-profile':
-            length = int(self.headers.get('Content-Length', '0'))
-            payload = json.loads(self.rfile.read(length))
             try:
+                payload = read_json_body(self)
                 ensure_browser(payload.get('url', 'https://cvat.edufun.ai'))
                 evaluate(f"location.href={json.dumps(payload.get('url', 'https://cvat.edufun.ai'))}")
                 self.send_json({'state': 'ready'})
@@ -149,7 +193,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != '/api/run':
             self.send_json({'error': 'Not found'}, 404)
             return
-        payload = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0'))))
+        payload = read_json_body(self)
         if not payload.get('url'):
             self.send_json({'error': 'Job URL is required'}, 400)
             return
