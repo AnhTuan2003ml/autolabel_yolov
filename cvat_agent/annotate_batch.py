@@ -4,10 +4,8 @@ from pathlib import Path
 
 try:
     from .cdp import evaluate
-    from .shape_rules import shape_for_label
 except ImportError:
     from cdp import evaluate
-    from shape_rules import shape_for_label
 
 
 def fetch_json(url):
@@ -37,9 +35,9 @@ def apply(job_id, prediction_dir, organization):
     for frame, items in predictions.items():
         for item in items:
             label_id = labels.get(item['label'])
-            shape_type = shape_for_label(item.get('label'))
+            shape_type = item.get('type')
             points = item.get('points', [])
-            if label_id is None or shape_type is None:
+            if label_id is None or shape_type not in {'rectangle', 'polygon'}:
                 continue
             if shape_type == 'rectangle' and len(points) != 4:
                 continue

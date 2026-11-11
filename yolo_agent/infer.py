@@ -4,21 +4,8 @@ from pathlib import Path
 
 from ultralytics import YOLO
 
-try:
-    from cvat_agent.shape_rules import shape_for_label
-except ImportError:
-    from ..cvat_agent.shape_rules import shape_for_label
-
-
 def polygon_points(segment):
     points = segment.tolist()
-    return [float(value) for pair in points for value in pair]
-
-
-def polyline_points(segment):
-    points = segment.tolist()
-    if len(points) > 2 and points[0] == points[-1]:
-        points = points[:-1]
     return [float(value) for pair in points for value in pair]
 
 
@@ -39,13 +26,14 @@ def infer(source, output, mode, model_name, confidence, device, label_map_path=N
         names = result.names
         for index, box in enumerate(result.boxes):
             name = label_map.get(names[int(box.cls[0])], names[int(box.cls[0])])
-            shape_type = shape_for_label(name)
-            if shape_type == 'rectangle':
+            if mode == 'bbox':
+                shape_type = 'rectangle'
                 detections.append({'type': shape_type, 'label': name, 'confidence': float(box.conf[0]), 'points': box.xyxy[0].detach().cpu().tolist()})
             elif result.masks is not None and index < len(result.masks.xy):
+                shape_type = 'polygon'
                 polygon = result.masks.xy[index]
-                points = polygon_points(polygon) if shape_type == 'polygon' else polyline_points(polygon)
-                if len(points) >= (6 if shape_type == 'polygon' else 4):
+                points = polygon_points(polygon)
+                if len(points) >= 6:
                     detections.append({'type': shape_type, 'label': name, 'confidence': float(box.conf[0]), 'points': points})
         (output_path / f'{image_path.stem}.json').write_text(json.dumps(detections, ensure_ascii=False), encoding='utf-8')
         print(f'[frame {image_index}/{image_total}] {image_path.name}: {len(detections)} detections', flush=True)
