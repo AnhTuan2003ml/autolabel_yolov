@@ -57,7 +57,13 @@ def page_target(url_part='cvat.edufun.ai'):
     for target in targets:
         if target.get('type') == 'page' and url_part in target.get('url', ''):
             return target
-    raise RuntimeError('CVAT page target was not found')
+    for target in targets:
+        if target.get('type') == 'page' and '127.0.0.1:8787' in target.get('url', ''):
+            return target
+    for target in targets:
+        if target.get('type') == 'page':
+            return target
+    raise RuntimeError('Browser page target was not found')
 
 
 def evaluate(expression, url_part='cvat.edufun.ai'):
