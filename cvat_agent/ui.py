@@ -37,6 +37,7 @@ PAGE = PAGE.replace('</details></section></section></main></div><div class="comp
 PAGE = PAGE.replace('<div class="messages" id="messages"></div><div class="row">', '<div class="row">')
 PAGE = PAGE.replace('.content{width:min(1000px,100%);margin:auto;padding:30px 24px 190px;flex:1}', '.content{width:min(1000px,100%);margin:auto;padding:30px 24px 190px;flex:1;display:flex;flex-direction:column;min-height:calc(100vh - 58px)}')
 PAGE = PAGE.replace('.messages{max-height:210px;overflow:auto}', '.chat-row{flex:1;min-height:180px;background:#191919;border:1px solid #383838;border-radius:12px;padding:12px;margin-top:14px;overflow:hidden}.chat-row .messages{height:100%;max-height:none;overflow:auto}.messages{max-height:210px;overflow:auto}')
+PAGE = PAGE.replace('</script></body></html>', "const growPrompt=()=>{const input=document.getElementById('prompt');input.style.height='auto';input.style.height=Math.min(input.scrollHeight,180)+'px';input.style.overflowY=input.scrollHeight>180?'auto':'hidden'};document.getElementById('prompt').addEventListener('input',growPrompt);growPrompt();</script></body></html>")
 
 
 def inspect_job(url):
