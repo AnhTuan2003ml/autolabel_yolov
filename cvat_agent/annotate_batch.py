@@ -32,7 +32,7 @@ def apply(job_id, prediction_dir, organization):
             break
         page += 1
     frames = set(predictions)
-    shapes = [{key: value for key, value in shape.items() if key != 'id'} for shape in existing.get('shapes', []) if shape.get('frame') not in frames]
+    shapes = []
     added = 0
     for frame, items in predictions.items():
         for item in items:
@@ -49,13 +49,14 @@ def apply(job_id, prediction_dir, organization):
                 continue
             shapes.append({'label_id': label_id, 'frame': frame, 'type': shape_type, 'points': points, 'outside': False, 'occluded': False, 'z_order': 0, 'rotation': 0, 'attributes': []})
             added += 1
-    tags = [{key: value for key, value in tag.items() if key != 'id'} for tag in existing.get('tags', []) if tag.get('frame') not in frames]
-    payload = {'version': existing.get('version', 0), 'tags': tags, 'shapes': shapes, 'tracks': existing.get('tracks', [])}
+    tags = [{key: value for key, value in tag.items() if key != 'id'} for tag in existing.get('tags', [])]
+    payload = {'version': existing.get('version', 0), 'tags': tags, 'shapes': shapes, 'tracks': []}
     expression = f"fetch('/api/jobs/{job_id}/annotations?org={organization}',{{method:'PUT',credentials:'include',headers:{{'Content-Type':'application/json','X-CSRFToken':decodeURIComponent(document.cookie.split('; ').find(x=>x.startsWith('csrftoken='))?.split('=')[1]||'')}},body:JSON.stringify({json.dumps(payload,separators=(',', ':'))})}}).then(async r=>{{if(!r.ok) throw new Error('HTTP '+r.status+' '+await r.text()); return r.status}})"
     status = evaluate(expression)
     unlock_and_show_labels()
     evaluate("[...document.querySelectorAll('button')].find(x=>x.innerText.trim()==='Save')?.click(); 'saved'")
-    return {'frames': len(frames), 'existing_shapes': len(existing.get('shapes', [])), 'added_shapes': added, 'status': status}
+    evaluate("setTimeout(()=>location.reload(),300); 'reload-scheduled'")
+    return {'frames': len(frames), 'cleared_shapes': len(existing.get('shapes', [])), 'added_shapes': added, 'status': status}
 
 
 if __name__ == '__main__':
