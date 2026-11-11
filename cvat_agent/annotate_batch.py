@@ -4,8 +4,10 @@ from pathlib import Path
 
 try:
     from .cdp import evaluate
+    from .shape_rules import shape_for_label
 except ImportError:
     from cdp import evaluate
+    from shape_rules import shape_for_label
 
 
 def fetch_json(url):
@@ -35,9 +37,17 @@ def apply(job_id, prediction_dir, organization):
     for frame, items in predictions.items():
         for item in items:
             label_id = labels.get(item['label'])
-            if label_id is None:
+            shape_type = shape_for_label(item.get('label'))
+            points = item.get('points', [])
+            if label_id is None or shape_type is None:
                 continue
-            shapes.append({'label_id': label_id, 'frame': frame, 'type': item.get('type', 'polygon'), 'points': item['points'], 'outside': False, 'occluded': False, 'z_order': 0, 'rotation': 0, 'attributes': []})
+            if shape_type == 'rectangle' and len(points) != 4:
+                continue
+            if shape_type == 'polygon' and len(points) < 6:
+                continue
+            if shape_type == 'polyline' and len(points) < 4:
+                continue
+            shapes.append({'label_id': label_id, 'frame': frame, 'type': shape_type, 'points': points, 'outside': False, 'occluded': False, 'z_order': 0, 'rotation': 0, 'attributes': []})
             added += 1
     tags = [{key: value for key, value in tag.items() if key != 'id'} for tag in existing.get('tags', []) if tag.get('frame') not in frames]
     payload = {'version': existing.get('version', 0), 'tags': tags, 'shapes': shapes, 'tracks': existing.get('tracks', [])}

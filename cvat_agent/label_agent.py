@@ -28,6 +28,16 @@ class LabelDescriptionAgent:
             'sidewalk': 'a sidewalk or pavement beside the road',
             'traffic light': 'a traffic light signal',
             'traffic sign': 'a roadside traffic sign',
+            'area/direct': 'the directly drivable road area',
+            'area/alternative': 'an alternative drivable road area',
+            'lane/crosswalk': 'a pedestrian crosswalk lane marking',
+            'lane/double white': 'a double white road lane marking',
+            'lane/double yellow': 'a double yellow road lane marking',
+            'lane/double other': 'a double non-white non-yellow road lane marking',
+            'lane/road curb': 'the road curb line',
+            'lane/single white': 'a single white road lane marking',
+            'lane/single yellow': 'a single yellow road lane marking',
+            'lane/single other': 'a single non-white non-yellow road lane marking',
         }
 
     def describe(self, label):

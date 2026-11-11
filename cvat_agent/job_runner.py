@@ -11,11 +11,13 @@ try:
     from .cdp import ensure_browser, evaluate
     from .job_data import save_chunk
     from .label_agent import LabelDescriptionAgent
+    from .shape_rules import SHAPE_RULES, allowed_labels
 except ImportError:
     from annotate_batch import apply
     from cdp import ensure_browser, evaluate
     from job_data import save_chunk
     from label_agent import LabelDescriptionAgent
+    from shape_rules import SHAPE_RULES, allowed_labels
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,7 +43,7 @@ def labels_for_job(job_id, destination):
         if not data.get('next'):
             break
         page += 1
-    labels = list(dict.fromkeys(labels))
+    labels = allowed_labels(labels)
     destination.write_text(json.dumps(labels, ensure_ascii=False), encoding='utf-8')
     return labels
 
@@ -67,7 +69,7 @@ def collect_images(job_id, start_frame, count, destination):
 
 
 def model_name(mode):
-    return 'yolo11x-seg.pt' if mode == 'segmentation' else 'yolo11x.pt'
+    return 'yolo11x-seg.pt'
 
 
 def run_yolo(images, predictions, mode, label_map):
@@ -126,7 +128,7 @@ def main(url, organization, model, mode, output_root, max_points=80, prompt_file
     prompts_path = run_dir / 'label_descriptions.json'
     descriptions = LabelDescriptionAgent().build(labels, prompts_path)
     if prompt_file:
-        descriptions = json.loads(Path(prompt_file).read_text(encoding='utf-8'))
+        descriptions = [item for item in json.loads(Path(prompt_file).read_text(encoding='utf-8')) if item.get('label') in SHAPE_RULES]
         prompts_path.write_text(json.dumps(descriptions, ensure_ascii=False, indent=2), encoding='utf-8')
         labels = [item['label'] for item in descriptions]
     print(f'[agent 4/8] Tạo {len(labels)} mô tả label', flush=True)
