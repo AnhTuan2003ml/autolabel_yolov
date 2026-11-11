@@ -23,7 +23,7 @@ SHAPE_RULES = {
 
 
 def allowed_labels(labels):
-    return [label for label in dict.fromkeys(labels) if label in SHAPE_RULES]
+    return list(dict.fromkeys(labels))
 
 
 def shape_for_label(label):

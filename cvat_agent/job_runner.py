@@ -17,12 +17,12 @@ try:
     from .cdp import ensure_browser, evaluate
     from .job_data import save_chunk
     from .label_agent import LabelDescriptionAgent
-    from .shape_rules import SHAPE_RULES, allowed_labels, shape_for_label
+    from .shape_rules import allowed_labels
 except ImportError:
     from cdp import ensure_browser, evaluate
     from job_data import save_chunk
     from label_agent import LabelDescriptionAgent
-    from shape_rules import SHAPE_RULES, allowed_labels, shape_for_label
+    from shape_rules import allowed_labels
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -221,7 +221,7 @@ def main(url, organization, model, mode, output_root, max_points=80, prompt_file
     prompts_path = run_dir / 'label_descriptions.json'
     descriptions = LabelDescriptionAgent().build(labels, prompts_path)
     if prompt_file:
-        descriptions = [item for item in json.loads(Path(prompt_file).read_text(encoding='utf-8')) if item.get('label') in SHAPE_RULES]
+        descriptions = json.loads(Path(prompt_file).read_text(encoding='utf-8'))
         prompts_path.write_text(json.dumps(descriptions, ensure_ascii=False, indent=2), encoding='utf-8')
         labels = [item['label'] for item in descriptions]
     log('4/8', f'Tạo {len(labels)} mô tả prompt bằng LabelDescriptionAgent')
