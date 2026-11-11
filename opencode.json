@@ -1,0 +1,7 @@
+{
+  "agent": "yolo-cvat-agent",
+  "description": "YOLO bbox and segmentation CVAT agent",
+  "model": "yolo11x",
+  "modes": ["bbox", "segmentation"],
+  "flow": ["cdp", "metadata", "labels", "frames", "inference", "replace", "upload"]
+}
