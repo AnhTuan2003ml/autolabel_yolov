@@ -14,7 +14,6 @@ try:
 except ImportError:
     from shape_rules import shape_for_label
 
-
 def polygon_from_mask(mask, max_points):
     image = (mask.astype(np.uint8) * 255)
     contours, _ = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -40,9 +39,7 @@ def polyline_from_mask(mask, max_points):
     if max_points > 0 and len(contour) > max_points:
         step = max(1, len(contour) // max_points)
         contour = contour[::step][:max_points]
-    if len(contour) < 2:
-        return []
-    return contour.reshape(-1).astype(float).tolist()
+    return contour.reshape(-1).astype(float).tolist() if len(contour) >= 2 else []
 
 
 def prompt_variants(label, prompt):
