@@ -60,12 +60,13 @@ def inspect_job(url):
 
 
 def filter_labels(message, descriptions):
-    text = message.strip().lower()
+    text = message.strip().lower().replace('ligt', 'light')
     if not text:
         return list(range(len(descriptions)))
     groups = {
         'người': {'person', 'pedestrian', 'rider'},
         'xe': {'car', 'truck', 'bus', 'train', 'motorcycle', 'bicycle', 'rider'},
+        'light': {'traffic light', 'traffic_light'},
         'giao thông': {'car', 'truck', 'bus', 'train', 'motorcycle', 'bicycle', 'traffic light', 'traffic_light', 'traffic sign', 'traffic_sign'},
         'cây': {'vegetation', 'tree', 'trees'},
         'thiên nhiên': {'vegetation', 'terrain', 'sky'},
