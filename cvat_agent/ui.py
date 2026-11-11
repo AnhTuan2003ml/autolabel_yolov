@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import subprocess
 import sys
@@ -20,6 +21,9 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parent.parent
 RUNS = ROOT / 'runs'
+AGENT_HOST = os.environ.get('CVAT_AGENT_HOST', '127.0.0.1')
+AGENT_PORT = int(os.environ.get('CVAT_AGENT_PORT', '8787'))
+AGENT_TOKEN = os.environ.get('CVAT_AGENT_TOKEN', '')
 JOBS = {}
 REVIEWS = {}
 PHASES = ['Kết nối CVAT', 'Đọc metadata', 'Lấy label', 'Sinh mô tả', 'Tải frame', 'Chạy SAM3', 'Hậu kiểm', 'Upload']
@@ -151,9 +155,26 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(value, ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def authorized(self):
+        return not AGENT_TOKEN or self.headers.get('X-Agent-Token', '') == AGENT_TOKEN
+
+    def run_agent_request(self, payload):
+        descriptions = inspect_job(payload.get('url', ''))[1]
+        selected = filter_labels(payload.get('message', ''), descriptions)
+        selected_prompts = [descriptions[index] for index in selected]
+        if not selected_prompts:
+            raise ValueError('Agent không tìm thấy label phù hợp')
+        run_id = uuid.uuid4().hex
+        prompt_file = RUNS / f'prompt_{run_id}.json'
+        prompt_file.write_text(json.dumps(selected_prompts, ensure_ascii=False, indent=2), encoding='utf-8')
+        run_payload = {'url': payload['url'], 'organization': payload.get('organization', ''), 'model': payload.get('model', 'sam3'), 'mode': payload.get('mode', 'segmentation'), 'max_points': payload.get('max_points', 80), 'prompt_file': str(prompt_file)}
+        threading.Thread(target=start, args=(run_payload, run_id), daemon=True).start()
+        return run_id, selected_prompts
 
     def do_GET(self):
         if self.path == '/':
@@ -167,10 +188,32 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({'state': 'ready'})
         elif self.path.startswith('/api/status'):
             self.send_json(JOBS.get(self.path.split('id=', 1)[-1], {'state': 'missing'}))
+        elif self.path == '/api/agent/schema':
+            self.send_json({'endpoint': '/api/agent/chat', 'method': 'POST', 'fields': {'url': 'CVAT job URL', 'organization': 'CVAT organization', 'message': 'Agent instruction', 'mode': 'segmentation or bbox', 'max_points': 'integer'}})
         else:
             self.send_json({'error': 'Not found'}, 404)
 
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-Agent-Token')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.end_headers()
+
     def do_POST(self):
+        if self.path == '/api/agent/chat':
+            if not self.authorized():
+                self.send_json({'error': 'Unauthorized'}, 401)
+                return
+            try:
+                payload = read_json_body(self)
+                if not payload.get('url') or not payload.get('message'):
+                    raise ValueError('url và message là bắt buộc')
+                run_id, selected = self.run_agent_request(payload)
+                self.send_json({'id': run_id, 'state': 'running', 'selected': selected})
+            except Exception as error:
+                self.send_json({'error': str(error)}, 500)
+            return
         if self.path == '/api/chat-filter':
             try:
                 payload = read_json_body(self)
@@ -229,6 +272,6 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     RUNS.mkdir(exist_ok=True)
-    server = ThreadingHTTPServer(('127.0.0.1', 8787), Handler)
-    threading.Timer(0.8, lambda: webbrowser.open('http://127.0.0.1:8787')).start()
+    server = ThreadingHTTPServer((AGENT_HOST, AGENT_PORT), Handler)
+    threading.Timer(0.8, lambda: webbrowser.open(f'http://127.0.0.1:{AGENT_PORT}')).start()
     server.serve_forever()
