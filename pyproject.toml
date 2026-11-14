@@ -10,4 +10,4 @@ requires-python = ">=3.10"
 dependencies = ["ultralytics>=8.3.0", "opencv-python>=4.10.0", "numpy>=1.26.0", "websocket-client>=1.8"]
 
 [tool.setuptools]
-packages = ["yolo_agent"]
+packages = ["yolo_agent", "cvat_agent"]
