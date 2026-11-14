@@ -6,3 +6,4 @@ runs/
 data/
 .docker/
 graphify-out/
+.opencode-config/

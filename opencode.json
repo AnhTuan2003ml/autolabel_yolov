@@ -1,7 +1,29 @@
 {
-  "agent": "yolo-cvat-agent",
-  "description": "YOLO bbox and segmentation CVAT agent",
-  "model": "yolo11x",
-  "modes": ["bbox", "segmentation"],
-  "flow": ["cdp", "metadata", "labels", "frames", "inference", "replace", "upload"]
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "yolo-cvat-agent",
+  "agent": {
+    "yolo-cvat-agent": {
+      "description": "Run and maintain the standalone YOLO CVAT annotation workflow for bbox, segmentation, tracking, and skeleton.",
+      "mode": "primary",
+      "prompt": "Read AGENTS.md as the canonical shared context for cxa, cxb, and OpenCode. Work only in this standalone YOLO repository. Use graphify, preserve comments and docstrings, keep changes scoped, and route CVAT inference through yolo_agent.infer without SAM3.",
+      "options": {
+        "modes": ["bbox", "segmentation", "tracking", "skeleton"],
+        "flow": ["cdp", "metadata", "labels", "frames", "yolo_agent.infer", "annotation-diff", "upload"],
+        "models": {
+          "bbox": "yolo11x.pt",
+          "segmentation": "yolo11x-seg.pt",
+          "tracking": "yolo11n.pt",
+          "skeleton": "yolo11n-pose.pt"
+        },
+        "tracker": "bytetrack.yaml",
+        "skeleton_keypoints": 17
+      },
+      "permission": {
+        "bash": "allow",
+        "edit": "allow",
+        "webfetch": "allow",
+        "external_directory": "ask"
+      }
+    }
+  }
 }
